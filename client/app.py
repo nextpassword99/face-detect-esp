@@ -4,19 +4,19 @@ import cv2
 import base64
 import json
 
+
 async def send_frames():
     uri = "ws://localhost:8000/ws/video"
-    
-    # Verificar si la cámara está disponible
+
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
         print("Error: No se puede acceder a la cámara")
         return
-    
+
     try:
         async with websockets.connect(uri) as websocket:
             print("Conectado al servidor")
-            
+
             try:
                 while True:
                     ret, frame = cap.read()
@@ -24,17 +24,14 @@ async def send_frames():
                         print("Error al capturar frame")
                         break
 
-                    # Redimensionar el frame para mejorar el rendimiento
                     frame = cv2.resize(frame, (320, 240))
 
-                    # Codificar el frame como JPEG
-                    _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                    _, buffer = cv2.imencode(
+                        '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
                     jpg_as_text = base64.b64encode(buffer).decode('utf-8')
 
-                    # Enviar el frame al servidor
                     await websocket.send("data:image/jpeg;base64," + jpg_as_text)
 
-                    # Recibir respuesta del servidor
                     response = await websocket.recv()
                     try:
                         data = json.loads(response)
@@ -43,13 +40,13 @@ async def send_frames():
                     except json.JSONDecodeError:
                         print("Respuesta del servidor:", response)
 
-                    await asyncio.sleep(0.1)  # 10 FPS
-                    
+                    await asyncio.sleep(0.1)
+
             except websockets.exceptions.ConnectionClosed:
                 print("Conexión cerrada por el servidor")
             except KeyboardInterrupt:
                 print("Interrumpido por el usuario")
-                
+
     except Exception as e:
         print(f"Error de conexión: {e}")
     finally:

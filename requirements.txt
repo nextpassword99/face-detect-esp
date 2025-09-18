@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+opencv-python
+websockets
+numpy
+face-recognition

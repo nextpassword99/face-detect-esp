@@ -8,10 +8,10 @@
 // =====================
 // Configuración general
 // =====================
-#define WIFI_SSID "SYSTEM32"
-#define WIFI_PASSWORD "edisonp21"
+#define WIFI_SSID "weeeeee"
+#define WIFI_PASSWORD "87654321"
 
-#define WS_HOST "192.168.18.24"
+#define WS_HOST "192.168.137.166"
 #define WS_PORT 8000
 #define WS_PATH "/ws/esp"
 
@@ -102,11 +102,12 @@ void setupWiFi()
 // ===================
 void setupOLED()
 {
+    Wire.begin(D6, D5);  // ✅ CONFIGURAR I2C: SDA = D6 (GPIO12), SCL = D5 (GPIO14)
+
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
         Serial.println("❌ No se detectó la pantalla OLED");
-        while (true)
-            ;
+        while (true);
     }
 
     display.clearDisplay();

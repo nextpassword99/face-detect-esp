@@ -4,95 +4,149 @@
 
 using namespace websockets;
 
+// =====================
+// Configuración general
+// =====================
+const char* WIFI_SSID = "OFIClNA";
+const char* WIFI_PASSWORD = "45074344";
 
-const char* ssid = "OFIClNA";
-const char* password = "45074344";
-const char* websocket_server = "ws://192.168.101.17:8000/ws/esp";
+const char* WS_SERVER = "ws://192.168.37.166:8000/ws/esp";
 
-const int ledPin = 2;
+const int LED_PIN = 2; // LED incorporado ESP32 (GPIO2)
 
+// ===================
+// Objetos globales
+// ===================
+WebsocketsClient webSocket;
 
-WebsocketsClient client;
-bool isConnected = false;
+// ===================
+// Estado del sistema
+// ===================
+bool isWebSocketConnected = false;
+int currentFaceCount = 0;
 
+// ===================
+// Prototipos de funciones
+// ===================
+void setupWiFi();
+void setupWebSocket();
+void handleWebSocketMessage(const String &message);
+void updateLED(int faceCount);
+void connectWebSocket();
 
-void onMessageCallback(WebsocketsMessage message) {
-  String payload = message.data();
-
-  StaticJsonDocument<200> doc;
-  DeserializationError error = deserializeJson(doc, payload);
-
-  if (error) {
-    Serial.print("Error al parsear JSON: ");
-    Serial.println(error.c_str());
-    return;
-  }
-
-  int num_faces = doc["num_faces"];
-  Serial.print("Rostros detectados: ");
-  Serial.println(num_faces);
-
-  if (num_faces > 0) {
-    digitalWrite(ledPin, HIGH);
-  } else {
-    digitalWrite(ledPin, LOW);
-  }
-}
-
-
-void onEventsCallback(WebsocketsEvent event, String data) {
-  if (event == WebsocketsEvent::ConnectionClosed) {
-    Serial.println("WebSocket desconectado");
-    isConnected = false;
-  } else if (event == WebsocketsEvent::GotPing) {
-    client.pong();
-  }
-}
-
-
+// ===================
+// Setup principal
+// ===================
 void setup() {
   Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW); // LED apagado inicialmente
 
+  setupWiFi();
 
-  Serial.print("Conectando a WiFi");
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("\nWiFi conectado!");
-  Serial.print("IP: ");
-  Serial.println(WiFi.localIP());
+  webSocket.onMessage([](WebsocketsMessage message) {
+    handleWebSocketMessage(message.data());
+  });
 
+  webSocket.onEvent([](WebsocketsEvent event, String data) {
+    switch (event) {
+      case WebsocketsEvent::ConnectionOpened:
+        Serial.println("✅ WebSocket conectado");
+        isWebSocketConnected = true;
+        break;
 
-  client.onMessage(onMessageCallback);
-  client.onEvent(onEventsCallback);
+      case WebsocketsEvent::ConnectionClosed:
+        Serial.println("❌ WebSocket desconectado");
+        isWebSocketConnected = false;
+        break;
 
+      case WebsocketsEvent::GotPing:
+        Serial.println("Ping recibido, enviando pong");
+        webSocket.pong();
+        break;
+
+      case WebsocketsEvent::GotPong:
+        Serial.println("Pong recibido");
+        break;
+
+      default:
+        break;
+    }
+  });
 
   connectWebSocket();
 }
 
+// ===================
+// Loop principal
+// ===================
+void loop() {
+  if (isWebSocketConnected) {
+    webSocket.poll();
+  } else {
+    static unsigned long lastAttemptTime = 0;
+    unsigned long now = millis();
+
+    // Reconectar cada 3 segundos
+    if (now - lastAttemptTime > 3000) {
+      lastAttemptTime = now;
+      Serial.println("Intentando reconectar WebSocket...");
+      connectWebSocket();
+    }
+  }
+
+  delay(10);
+}
+
+// ===================
+// Funciones
+// ===================
+
+void setupWiFi() {
+  Serial.print("Conectando a WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi conectado!");
+  Serial.print("IP: ");
+  Serial.println(WiFi.localIP());
+}
+
 void connectWebSocket() {
   Serial.println("Conectando al WebSocket...");
-  isConnected = client.connect(websocket_server);
+  isWebSocketConnected = webSocket.connect(WS_SERVER);
 
-  if (isConnected) {
+  if (isWebSocketConnected) {
     Serial.println("✅ WebSocket conectado!");
   } else {
     Serial.println("❌ Fallo al conectar WebSocket");
   }
 }
 
-void loop() {
-  if (isConnected) {
-    client.poll();
-  } else {
-    Serial.println("Intentando reconectar WebSocket...");
-    connectWebSocket();
-    delay(2000);
+void handleWebSocketMessage(const String &message) {
+  StaticJsonDocument<200> doc;
+  DeserializationError error = deserializeJson(doc, message);
+
+  if (error) {
+    Serial.print("❌ JSON inválido: ");
+    Serial.println(error.c_str());
+    return;
   }
 
-  delay(100);
+  int faceCount = doc["num_faces"] | 0;
+  Serial.printf("👤 Rostros detectados: %d\n", faceCount);
+
+  currentFaceCount = faceCount;
+  updateLED(faceCount);
+}
+
+void updateLED(int faceCount) {
+  if (faceCount > 0) {
+    digitalWrite(LED_PIN, HIGH);  // LED ON
+  } else {
+    digitalWrite(LED_PIN, LOW);   // LED OFF
+  }
 }

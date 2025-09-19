@@ -7,10 +7,10 @@ using namespace websockets;
 // =====================
 // Configuración general
 // =====================
-const char* WIFI_SSID = "OFIClNA";
-const char* WIFI_PASSWORD = "45074344";
+const char* WIFI_SSID = "weeeeee";
+const char* WIFI_PASSWORD = "87654321";
 
-const char* WS_SERVER = "ws://192.168.37.166:8000/ws/esp";
+const char* WS_SERVER = "ws://192.168.137.166:8000/ws/esp";
 
 const int LED_PIN = 2; // LED incorporado ESP32 (GPIO2)
 
